@@ -307,107 +307,120 @@ Open `http://localhost:3001`. Create a CloudCLI account. Sign in with your Anthr
 
 ## :whale2: Docker Compose — Full
 
-Same image, every knob exposed. Copy this entire block into a `docker-compose.yaml` file:
+This example mirrors a fuller workstation-style setup: Claude, Codex, CloudCLI, opencode, Junie, and Playwright data are persisted explicitly. Put this next to your compose file as `.env` first:
+
+```dotenv
+# Host-side web port for CloudCLI
+HOLYCLAUDE_HOST_PORT=3001
+
+# Local timezone and host user mapping. Run: id -u && id -g
+TZ=Asia/Taipei
+PUID=1000
+PGID=1000
+
+# Relative paths keep this portable across machines and Portainer stacks.
+HOLYCLAUDE_DATA_DIR=./data
+HOLYCLAUDE_HOST_WORKSPACE_DIR=./workspace
+
+# Required by the host Claude/Codex sharing mounts below.
+# If you do not want to share host auth/extensions, remove those volume lines.
+# macOS example: /Users/yourname
+# Linux example: /home/yourname
+HOLYCLAUDE_HOST_HOME=/Users/yourname
+```
+
+Then copy this into `docker-compose.yaml`:
 
 ```yaml
 # ==============================================================================
 # HolyClaude — Full Configuration
-# All options documented inline.
-# Detailed docs: https://github.com/CoderLuii/HolyClaude/blob/master/docs/configuration.md
+# Just run: docker compose up -d
+# Then open: http://localhost:${HOLYCLAUDE_HOST_PORT:-3001}
 # ==============================================================================
 
 services:
   holyclaude:
-    image: jhangyu/holyclaude:latest       # Full image
+    image: jhangyu/holyclaude:latest
     container_name: holyclaude
     hostname: holyclaude
     restart: unless-stopped
-    shm_size: 2g                           # Chromium shared memory — increase to 4g for heavy browser use
+    shm_size: 2g
     network_mode: bridge
     cap_add:
-      - SYS_ADMIN                          # Required: Chromium sandboxing
-      - SYS_PTRACE                         # Required: debugging tools (strace, lsof)
+      - SYS_ADMIN
+      - SYS_PTRACE
     security_opt:
-      - seccomp=unconfined                 # Required: Chromium syscall requirements
+      - seccomp=unconfined
     ports:
-      #
-      # CloudCLI web UI — this is the only port you need.
-      # Override the host-side port from `.env` if 3001 is already in use.
-      #
-      - "${HOLYCLAUDE_HOST_PORT:-3001}:3001"
-      #
-      # Dev server ports — uncomment as needed.
-      # These let you access dev servers running inside the container from your host browser.
-      #
-      # - "3000:3000"                      # Next.js / Express
-      # - "4321:4321"                      # Astro
-      # - "5173:5173"                      # Vite
-      # - "8787:8787"                      # Wrangler (Cloudflare Workers)
-      # - "9229:9229"                      # Node.js debugger
-      # - "1455:1455"                      # Codex auth callback port
+      - "${HOLYCLAUDE_HOST_PORT:-3001}:3001"   # CloudCLI web UI
+      # --- Uncomment ports as needed ---
+      # - "3000:3000"      # Next.js / Express dev server
+      # - "4321:4321"      # Astro dev server
+      # - "5173:5173"      # Vite dev server
+      # - "8080:8080"      # Generic HTTP dev server
+      # - "8787:8787"      # Cloudflare Wrangler dev
+      # - "9229:9229"      # Node.js debugger
+      # - "1455:1455"      # Codex auth callback port
     volumes:
-      #
-      # PERSISTENT DATA
-      #
-      # ./data/claude — Settings, credentials, API keys, Claude's memory file.
-      #                  Survives container rebuilds. NEVER delete this folder.
-      #                  Override the host path from `.env` if you want it elsewhere.
-      #
-      - ${HOLYCLAUDE_HOST_CLAUDE_DIR:-./data/claude}:/home/claude/.claude
-      #
-      # ./workspace — Your code and projects. Everything you build goes here.
-      #               Accessible from your host machine.
-      #               Override the host path from `.env` if you want a different root.
-      #
+      # Claude Code container-local settings and sessions.
+      # This keeps /home/claude/.claude/settings.json separate from your host.
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/claude:/home/claude/.claude
+
+      # Optional host Claude sharing: auth, skills, plugins, and agents only.
+      # Requires HOLYCLAUDE_HOST_HOME in .env. Sessions are intentionally not shared.
+      - ${HOLYCLAUDE_HOST_HOME}/.claude.json:/home/claude/.claude.json
+      - ${HOLYCLAUDE_HOST_HOME}/.claude/skills:/home/claude/.claude/skills
+      - ${HOLYCLAUDE_HOST_HOME}/.claude/plugins:/home/claude/.claude/plugins
+      - ${HOLYCLAUDE_HOST_HOME}/.claude/agents:/home/claude/.claude/agents
+
+      # OpenAI Codex CLI data. This shares auth, config, skills, plugins, sessions, and logs.
+      - ${HOLYCLAUDE_HOST_HOME}/.codex:/home/claude/.codex
+
+      # CloudCLI / Claude Code UI account database, plugins, and UI state.
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/cloudcli:/home/claude/.cloudcli
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/claude-code-ui:/home/claude/.claude-code-ui
+
+      # Other agent/tool state. Keep these scoped instead of mounting all of ~/.local.
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/opencode-config:/home/claude/.config/opencode
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/opencode-data:/home/claude/.local/share/opencode
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/junie:/home/claude/.local/share/junie
+
+      # Playwright browser binaries. Pair with PLAYWRIGHT_BROWSERS_PATH below.
+      - ${HOLYCLAUDE_DATA_DIR:-./data}/playwright:/home/claude/.cache/ms-playwright
+
+      # Your projects. In CloudCLI, use /workspace as the workspace path.
       - ${HOLYCLAUDE_HOST_WORKSPACE_DIR:-./workspace}:/workspace
+
+      # Optional host integrations.
+      # - ${HOLYCLAUDE_HOST_HOME}/.gitconfig:/home/claude/.gitconfig:ro
+      # - ${HOLYCLAUDE_HOST_HOME}/.ssh:/home/claude/.ssh:ro
+
+      # Package caches for faster rebuilds and repeated installs.
+      - holyclaude-npm-cache:/home/claude/.npm
+      - holyclaude-pip-cache:/home/claude/.cache/pip
     environment:
-      #
-      # TIMEZONE
-      # Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-      #
-      - TZ=UTC
-      #
-      # PERFORMANCE
-      # Node.js heap memory limit in MB. Increase if you work on large monorepos
-      # and hit out-of-memory errors. 4096 (4GB) is a solid default.
-      #
+      - TZ=${TZ:-UTC}
       - NODE_OPTIONS=--max-old-space-size=4096
-      #
-      # USER MAPPING
-      # Match these to your host user so files created inside the container
-      # have the right ownership on your host. Run `id -u` and `id -g` on your host.
-      #
-      - PUID=1000
-      - PGID=1000
-      #
-      # SMB/CIFS NETWORK MOUNTS
-      # Only enable these if your volumes are on a NAS, Samba share, or CIFS mount.
-      # They enable polling-based file watching since network mounts don't support inotify.
-      # Leave commented out for local storage — polling uses more CPU.
-      #
+      - PLAYWRIGHT_BROWSERS_PATH=/home/claude/.cache/ms-playwright
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+
+      # Enable only when workspace/data lives on SMB/CIFS/NFS network storage.
       # - CHOKIDAR_USEPOLLING=1
       # - WATCHFILES_FORCE_POLLING=true
-      #
-      # NOTIFICATIONS (optional)
-      # Get notified when Claude finishes a task or hits an error.
-      # Uses Apprise — supports 100+ services. Also requires creating a flag file
-      # inside the container: touch ~/.claude/notify-on
-      #
-      # - NOTIFY_DISCORD=discord://webhook_id/webhook_token
-      # - NOTIFY_TELEGRAM=tg://bot_token/chat_id
-      # - NOTIFY_PUSHOVER=pover://user_key@app_token
-      # - NOTIFY_SLACK=slack://token_a/token_b/token_c
-      # - NOTIFY_EMAIL=mailto://user:pass@gmail.com?to=you@gmail.com
-      # - NOTIFY_GOTIFY=gotify://hostname/token
-      # - NOTIFY_URLS=                                   # catch-all: comma-separated Apprise URLs
-      #
-      # AI PROVIDER KEYS (optional)
-      # Claude Code can authenticate via web UI (OAuth) or ANTHROPIC_API_KEY.
-      # Set these if you want to use additional AI CLIs or API-based auth.
-      #
-      # - GEMINI_API_KEY=your_key
-      # - OPENAI_API_KEY=your_key
-      # - CURSOR_API_KEY=your_key
+
+      # AI provider keys are optional. You can also authenticate from the web UI.
+      # - ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
+      # - ANTHROPIC_AUTH_TOKEN=
+      # - ANTHROPIC_BASE_URL=https://your-proxy.example.com
+      # - GEMINI_API_KEY=AIzaXXXXXX
+      # - OPENAI_API_KEY=sk-xxxxxxxxxx
+      # - CURSOR_API_KEY=
+      # - OLLAMA_HOST=http://host.docker.internal:11434
+
+volumes:
+  holyclaude-npm-cache:
+  holyclaude-pip-cache:
 ```
 
 Then:
@@ -416,15 +429,9 @@ Then:
 docker compose up -d
 ```
 
-If you want to change the host-side port or bind-mount paths without editing compose, copy `.env.example` to `.env` and set:
+Open `http://localhost:${HOLYCLAUDE_HOST_PORT:-3001}`. Create a CloudCLI account. Sign in with your Anthropic account. In the web UI, set the workspace path to `/workspace`.
 
-```dotenv
-HOLYCLAUDE_HOST_PORT=3003
-HOLYCLAUDE_HOST_CLAUDE_DIR=./data/claude
-HOLYCLAUDE_HOST_WORKSPACE_DIR=./workspace
-```
-
-These values are read by Docker Compose on the host. They are not container environment variables.
+For Portainer stacks, do not use `~` in bind mounts. Set `HOLYCLAUDE_HOST_HOME` to an absolute path such as `/Users/yourname` or keep service-specific data under the relative `HOLYCLAUDE_DATA_DIR` path.
 
 ### What each section controls:
 
