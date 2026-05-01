@@ -229,7 +229,7 @@ Two flavors. Same quality. Pick your weight class.
 
 ```bash
 # Full — batteries included (recommended)
-docker pull coderluii/holyclaude
+docker pull jhangyu/holyclaude
 
 # Slim — lean and mean
 docker pull coderluii/holyclaude:slim
@@ -256,7 +256,7 @@ The "I just want it running" template. Copy this entire block into a `docker-com
 
 services:
   holyclaude:
-    image: coderluii/holyclaude:latest     # Full image (use :slim for smaller download)
+    image: jhangyu/holyclaude:latest       # Full image
     container_name: holyclaude
     hostname: holyclaude
     restart: unless-stopped
@@ -318,7 +318,7 @@ Same image, every knob exposed. Copy this entire block into a `docker-compose.ya
 
 services:
   holyclaude:
-    image: coderluii/holyclaude:latest     # Full image (use :slim for smaller download)
+    image: jhangyu/holyclaude:latest       # Full image
     container_name: holyclaude
     hostname: holyclaude
     restart: unless-stopped
@@ -1035,9 +1035,9 @@ docker build --build-arg VARIANT=slim -t holyclaude:slim .
 docker buildx build --platform linux/arm64 -t holyclaude .
 ```
 
-This source release vendors the patched CloudCLI package under `vendor/artifacts/`, so `docker build` installs that bundled tarball instead of downloading `@siteboon/claude-code-ui` from npm.
+This fork installs CloudCLI from npm with `@cloudcli-ai/cloudcli` and includes the official `@anthropic-ai/claude-code` package during the image build.
 
-Then use `image: holyclaude` instead of `image: coderluii/holyclaude:latest` in your compose file.
+Then use `image: holyclaude` instead of `image: jhangyu/holyclaude:latest` in your compose file.
 
 <p align="right">
   <a href="#top">↑ back to top</a>
@@ -1155,7 +1155,7 @@ The HolyClaude Docker image includes third-party software, each under its own li
 
 | Component | License | Source |
 |-----------|---------|--------|
-| CloudCLI | GPL-3.0 | [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui) |
+| CloudCLI | AGPL-3.0-or-later | [@cloudcli-ai/cloudcli](https://www.npmjs.com/package/@cloudcli-ai/cloudcli) |
 | s6-overlay | ISC | [just-containers/s6-overlay](https://github.com/just-containers/s6-overlay) |
 | Node.js | MIT | [nodejs/node](https://github.com/nodejs/node) |
 
