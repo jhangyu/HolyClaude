@@ -23,6 +23,10 @@ desktop.ini
 # Node
 node_modules/
 
+# Python
+__pycache__/
+*.py[cod]
+
 # Docker
 docker-compose.override.yaml
 docker-compose.override.yml

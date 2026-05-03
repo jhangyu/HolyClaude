@@ -3,4 +3,5 @@ cd /workspace
 export HOME=/home/claude
 export WORKSPACES_ROOT=/workspace
 export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--no-deprecation"
+python3 /usr/local/bin/fix-cloudcli-session-titles.py --mode runtime || true
 exec s6-setuidgid claude cloudcli --port 3001

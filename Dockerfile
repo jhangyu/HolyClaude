@@ -126,6 +126,9 @@ RUN set -eux; \
 USER root
 ENV PATH="/home/claude/.local/bin:${PATH}"
 
+COPY scripts/fix-cloudcli-session-titles.py /usr/local/bin/fix-cloudcli-session-titles.py
+RUN chmod +x /usr/local/bin/fix-cloudcli-session-titles.py
+
 # ---------- npm global packages ----------
 RUN set -eux; \
     packages="\
@@ -153,6 +156,7 @@ RUN set -eux; \
     npm i -g --omit=dev --no-audit --no-fund $packages; \
     touch /usr/local/lib/node_modules/@cloudcli-ai/cloudcli/.env; \
     ln -sf /usr/local/bin/cloudcli /usr/local/bin/claude-code-ui; \
+    python3 /usr/local/bin/fix-cloudcli-session-titles.py --mode build; \
     npm cache clean --force; \
     find /usr/local/lib/node_modules -type f -name '*.map' -delete; \
     find /usr/local/lib/node_modules -type d \( \
