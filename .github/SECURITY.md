@@ -20,10 +20,14 @@ These are required for Chromium to function and are standard across Playwright, 
 
 | Mode | Default? | What it means |
 |------|----------|--------------|
-| `allowEdits` | **Yes** | Claude can edit files freely, asks before running shell commands |
-| `bypassPermissions` | No | Claude runs any command without confirmation |
+| `acceptEdits` | **Yes** | Claude Code can edit files freely, with shell commands still following Claude Code's current prompt behavior |
+| `bypassPermissions` | No | The agent runs commands without confirmation |
 
-The default `allowEdits` mode is safe for most users. `bypassPermissions` is documented for power users who understand the implications.
+The default `acceptEdits` mode is right for most users. `bypassPermissions` is documented for power users who understand the implications.
+
+Codex support uses configurable near-parity modes, not identical security. `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE` controls CloudCLI Codex chat at runtime, while `HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE` only seeds a new raw `codex` CLI `~/.codex/config.toml` on first boot. Valid values are `default`, `acceptEdits`, and `bypassPermissions`; `acceptEdits` is recommended.
+
+Do not expose CloudCLI directly to the public internet, especially with any bypass mode enabled. Docker limits access to the container and mounted volumes, but CloudCLI still exposes an interactive coding environment with credentials and mounted workspace files.
 
 ## Credential Storage
 

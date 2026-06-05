@@ -268,7 +268,7 @@ services:
     security_opt:
       - seccomp=unconfined                 # Required: Chromium in Docker
     ports:
-      - "3001:3001"                        # CloudCLI web UI
+      - "127.0.0.1:3001:3001"              # CloudCLI web UI, localhost only
     volumes:
       #
       # ./data/claude — Your settings, credentials, API keys, and Claude's memory.
@@ -295,7 +295,7 @@ Open `http://localhost:3001`. Create a CloudCLI account. Sign in with your Anthr
 
 **That's the whole setup. You're done.**
 
-> **Why `SYS_ADMIN` + `seccomp=unconfined`?** Chromium needs these to run inside Docker — it's standard for any containerized browser (Playwright docs, Puppeteer docs, every CI pipeline that runs browser tests). Without them, Chromium crashes on startup. This is not a security risk unique to HolyClaude.
+> **Why `SYS_ADMIN` + `seccomp=unconfined`?** Chromium needs these to run inside Docker. They are common for containerized browser workloads, but they do reduce container isolation. Keep the web UI bound to `127.0.0.1` unless you put a real private tunnel or access layer in front of it.
 
 > **Why `shm_size: 2g`?** Docker gives containers 64MB of shared memory by default. Chromium uses `/dev/shm` heavily for tab rendering. At 64MB, tabs crash randomly. 2GB is the recommended minimum for any Chromium-in-Docker setup.
 
@@ -481,6 +481,8 @@ The complete reference. Every variable, what it defaults to, what it does.
 | `GEMINI_API_KEY` | *(unset)* | Google Gemini API key |
 | `OPENAI_API_KEY` | *(unset)* | OpenAI API key (for Codex CLI, or use `codex login --device-auth` for ChatGPT subscription) |
 | `CURSOR_API_KEY` | *(unset)* | Cursor API key |
+| `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE` | `acceptEdits` | CloudCLI Codex chat runtime mode. Valid: `default`, `acceptEdits`, `bypassPermissions` |
+| `HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE` | `default` | Raw `codex` CLI first-boot mode for new `~/.codex/config.toml` only. Valid: `default`, `acceptEdits`, `bypassPermissions` |
 
 <p align="right">
   <a href="#top">↑ back to top</a>
@@ -495,7 +497,7 @@ This is not a minimal container. This is an entire development workstation.
 ### Both variants (full + slim)
 
 <details>
-<summary><strong>Node.js 22 LTS + npm global packages</strong></summary>
+<summary><strong>Node.js 26 + npm global packages</strong></summary>
 
 | Package | What it's for |
 |---------|---------------|
@@ -546,7 +548,7 @@ This is not a minimal container. This is an entire development workstation.
 </details>
 
 <details>
-<summary><strong>AI CLIs — every major provider</strong></summary>
+<summary><strong>AI CLIs — core providers in both variants</strong></summary>
 
 | CLI | Command | What it's for |
 |-----|---------|---------------|
@@ -555,16 +557,24 @@ This is not a minimal container. This is an entire development workstation.
 | **OpenAI Codex** | `codex` | OpenAI's coding agent |
 | **Cursor** | `cursor` | Cursor's AI agent |
 | **TaskMaster AI** | `task-master` | Task planning and orchestration |
-| **Junie** | `junie` | JetBrains' AI coding agent |
-| **OpenCode** | `opencode` | Open source AI agent (multiple providers) |
 
-Seven AI CLIs. One container. Switch between them instantly. No other Docker image does this.
+Five AI CLIs ship in both full and slim. The full image adds Junie and OpenCode below, for seven AI CLIs total.
 
 </details>
 
 ### Full image only (additional packages)
 
 The full image includes everything above, plus:
+
+<details>
+<summary><strong>Additional AI CLIs</strong></summary>
+
+| CLI | Command | What it's for |
+|-----|---------|---------------|
+| **Junie** | `junie` | JetBrains' AI coding agent |
+| **OpenCode** | `opencode` | Open source AI agent (multiple providers) |
+
+</details>
 
 <details>
 <summary><strong>Additional npm packages — deployment, ORMs, performance</strong></summary>
@@ -620,7 +630,7 @@ The full image includes everything above, plus:
 
 ## :robot: AI CLI Providers
 
-Seven AI CLIs. One container. No other Docker image gives you this.
+The full image ships seven AI CLIs. The slim image ships the five core CLIs.
 
 | Provider | Command | How to authenticate | Subscription works? |
 |----------|---------|--------------------|--------------------|
@@ -629,8 +639,8 @@ Seven AI CLIs. One container. No other Docker image gives you this.
 | **OpenAI Codex** | `codex` | `OPENAI_API_KEY` or `codex login --device-auth` | **Yes** — ChatGPT Plus/Pro/Team/Enterprise or API key |
 | **Cursor** | `cursor` | `CURSOR_API_KEY` env var | API key |
 | **TaskMaster AI** | `task-master` | Uses existing AI provider keys | Works with configured keys |
-| **Junie** | `junie` | JetBrains AI subscription | JetBrains account required |
-| **OpenCode** | `opencode` | Configure via TUI | Supports multiple providers |
+| **Junie** | `junie` | JetBrains AI subscription | JetBrains account required, full image only |
+| **OpenCode** | `opencode` | Configure via TUI | Supports multiple providers, full image only |
 
 > Claude Code is the primary CLI. The others are there because sometimes you want a second opinion, or a specific model's strengths, or you're comparing outputs. Having all of them one `Tab` away is the whole point.
 
@@ -797,14 +807,14 @@ A bind mount to a local SSD path is fine too, just keep it off any network share
 
 ## :lock: Permissions
 
-Claude Code runs in **`allowEdits`** mode by default. This is the safest useful setting:
+Claude Code runs in **`acceptEdits`** mode by default. This is the shipped setting:
 
 | Action | Allowed? |
 |--------|----------|
 | Read files | Yes |
 | Edit / create files | Yes |
-| Run shell commands | **Asks you first** |
-| Install packages | **Asks you first** |
+| Run shell commands | Depends on Claude Code's current permission prompt |
+| Install packages | Depends on Claude Code's current permission prompt |
 
 ### Want full bypass? (power users)
 
@@ -818,7 +828,20 @@ This is how I personally run it. Edit `./data/claude/settings.json` on your host
 }
 ```
 
-> **Bypass mode means Claude executes any command without confirmation.** Fast, powerful, and exactly what you want if you trust what you're building. But `allowEdits` is the safe default for a reason.
+> **Bypass mode means Claude executes commands without confirmation.** It is powerful, but it can also run destructive commands quickly. Keep the shipped `acceptEdits` default unless you trust the workspace and every prompt you run.
+
+### Codex Permission Modes
+
+HolyClaude also ships configurable near-parity permission modes for Codex, with separate controls for CloudCLI Codex chat and the raw `codex` CLI.
+
+| Setting | Applies to | Default | When it is read |
+|---------|------------|---------|-----------------|
+| `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE` | CloudCLI Codex chat in the browser | `acceptEdits` | Runtime container config, read by the CloudCLI Codex provider |
+| `HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE` | Raw `codex` CLI config at `~/.codex/config.toml` | `default` | First boot only, when the file does not already exist |
+
+Valid values for both are `default`, `acceptEdits`, and `bypassPermissions`. `acceptEdits` is recommended. For CloudCLI Codex chat, the value is runtime container configuration, so changing it and recreating the container changes future chat runs. For the raw `codex` CLI, the value only seeds a new `~/.codex/config.toml`; existing configs are not overwritten, and the generated value persists until you edit that file yourself.
+
+`bypassPermissions` maps Codex to full access with no approval. Inside Docker, that still runs within the container and mounted volumes, but it can read and change anything reachable through those mounts, especially `/workspace` and persisted config under `/home/claude`. Use it only for trusted local workspaces, and don't expose CloudCLI directly to the public internet.
 
 <p align="right">
   <a href="#top">↑ back to top</a>
@@ -828,7 +851,7 @@ This is how I personally run it. Edit `./data/claude/settings.json` on your host
 
 ## :shield: Remote Access & Exposure
 
-HolyClaude binds CloudCLI to port `3001`. By default that's local-only — fine for running on your laptop or a home server you SSH into.
+HolyClaude binds CloudCLI to `127.0.0.1:3001` by default. That keeps the web UI on the Docker host only, which is right for a laptop or a home server you reach over SSH.
 
 **The moment you want to reach it from outside your network, read this section.**
 
@@ -837,7 +860,7 @@ HolyClaude binds CloudCLI to port `3001`. By default that's local-only — fine 
 I'll say it flat out: do not punch a hole in your router and expose `3001` to the open internet. Not even with a password. Here's why:
 
 - CloudCLI exposes a full shell through the web terminal plugin
-- It can run arbitrary code, install packages, and read/write your entire `/workspace`
+- It can run arbitrary code, install packages, and read/write your mounted `/workspace`
 - It holds your Anthropic OAuth tokens and API keys
 - Basic auth / app-level passwords get brute-forced, credential-stuffed, and scraped out of logs
 - One leaked password = someone else has a paid Claude Code instance running on your box with your money
@@ -865,7 +888,7 @@ If you absolutely have to skip the tunnel (self-hosting tutorial, isolated lab n
 
 1. **Put a reverse proxy in front of it** (Caddy, nginx, Traefik) with real TLS
 2. **Add IP allowlisting** at the firewall or proxy level — only your known IPs
-3. **Enable `bypassPermissions: false`** (the default) so shell commands still prompt
+3. **Keep the shipped `acceptEdits` default** unless you have a clear reason to use `bypassPermissions`
 4. **Rotate your Anthropic credentials** if anything looks off
 5. **Run behind Cloudflare Access or similar SSO**, not basic auth
 
@@ -879,7 +902,7 @@ Even with all that, the risk surface is huge. Use Tailscale or Cloudflare Tunnel
 
 ## :bell: Notifications
 
-Walk away from your computer and know when your AI agents are done. Claude Code, Codex, and Gemini CLI all send notifications when a task completes. Uses [Apprise](https://github.com/caronc/apprise) — supports 100+ services including Discord, Telegram, Slack, Email, Pushover, Gotify, and more.
+Walk away from your computer and know when a task is done. Claude Code hooks, raw CLI hooks for Codex and Gemini CLI, and CloudCLI Codex chat completion/failure events use the same [Apprise](https://github.com/caronc/apprise) setup. Apprise supports 100+ services including Discord, Telegram, Slack, Email, Pushover, Gotify, and more.
 
 **To enable:**
 
@@ -897,8 +920,8 @@ See [configuration docs](docs/configuration.md#notifications-apprise) for all su
 **Events that trigger notifications:**
 | Event | What happened |
 |-------|--------------|
-| `stop` | Claude Code, Codex, or Gemini finished the current task |
-| `error` | A tool use failure occurred |
+| `stop` | Claude Code hooks, raw CLI hooks for Codex and Gemini CLI, or a CloudCLI Codex chat run finished |
+| `error` | A Claude Code hook, raw CLI hook, or CloudCLI Codex chat run failed |
 
 > Completely silent when not configured. No `NOTIFY_*` vars set? No flag file? Zero network calls. Zero log spam. Zero overhead.
 
@@ -939,9 +962,9 @@ image: coderluii/holyclaude:1.1.2   # instead of :latest
 
 CloudCLI opens to `/home/claude` instead of `/workspace`.
 
-**Cause:** `WORKSPACES_ROOT` not reaching the CloudCLI process. Docker-compose env vars don't pass through s6-overlay's `s6-setuidgid` — it runs with a clean environment by design (security feature, not a bug).
+**Cause:** A custom or modified CloudCLI service script did not set `WORKSPACES_ROOT=/workspace` before launching CloudCLI.
 
-**Fix:** Already handled in HolyClaude. The s6 run script sets `WORKSPACES_ROOT=/workspace` directly in the process environment.
+**Fix:** Already handled in HolyClaude. The s6 run script uses `with-contenv`, exports `WORKSPACES_ROOT=/workspace`, then starts CloudCLI as the `claude` user.
 </details>
 
 <details>

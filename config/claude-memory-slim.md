@@ -24,7 +24,7 @@ You are running inside a **HolyClaude Docker container** (slim variant). Core to
 
 Both managed by s6-overlay — they auto-restart on failure.
 
-## Node.js & npm (v22 LTS)
+## Node.js & npm (v26)
 
 ### Pre-installed global packages:
 - **Languages:** typescript, tsx
@@ -112,7 +112,7 @@ These take longer to install (~1-2 minutes) because they require system dependen
 |-----|---------|-------|
 | **Claude Code** | `claude` | Primary — you are running inside this |
 | **Gemini CLI** | `gemini` | Requires `GEMINI_API_KEY` env var |
-| **OpenAI Codex** | `codex` | Requires `OPENAI_API_KEY` env var |
+| **OpenAI Codex** | `codex` | `OPENAI_API_KEY` or ChatGPT subscription (`codex login --device-auth`). Raw CLI config is seeded on first boot. |
 | **Cursor** | `cursor` | Requires `CURSOR_API_KEY` env var |
 | **TaskMaster AI** | `task-master` | Task planning and management |
 
@@ -176,10 +176,15 @@ Optional push notifications via [Apprise](https://github.com/caronc/apprise) —
 
 ## Permissions
 
-Claude Code runs in `allowEdits` mode by default:
+Claude Code runs in `acceptEdits` mode by default:
 - File edits: allowed without confirmation
-- Shell commands: asks for confirmation
-- To enable full bypass: change `allowEdits` to `bypassPermissions` in `~/.claude/settings.json`
+- Shell commands: follow Claude Code's current permission prompt behavior
+- To enable full bypass: change `acceptEdits` to `bypassPermissions` in `~/.claude/settings.json`
+
+Codex has separate configurable near-parity controls:
+- CloudCLI Codex chat: `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE`, read at runtime by CloudCLI. Valid values: `default`, `acceptEdits`, `bypassPermissions`. Recommended: `acceptEdits`.
+- Raw `codex` CLI: `HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE`, used only when creating a new `~/.codex/config.toml` on first boot. Existing configs are not overwritten, and the generated value persists until you edit it.
+- `bypassPermissions` gives full access with no approval inside the Docker container and mounted volumes. Use it only for trusted local workspaces.
 
 ## Container Lifecycle
 

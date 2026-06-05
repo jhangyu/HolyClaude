@@ -42,14 +42,35 @@ echo "[bootstrap] Configured git as '$GIT_USER_NAME <$GIT_USER_EMAIL>'"
 
 # ---------- Codex CLI default configuration ----------
 if [ ! -f "$CLAUDE_HOME/.codex/config.toml" ]; then
-    cat > "$CLAUDE_HOME/.codex/config.toml" <<'TOML'
-approval_policy = "on-request"
-sandbox_mode = "workspace-write"
+    CODEX_CLI_APPROVAL_POLICY="on-request"
+    CODEX_CLI_SANDBOX_MODE="workspace-write"
+    CODEX_CLI_CONFIG_LABEL="on-request approval, workspace-write sandbox"
+
+    case "${HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE:-default}" in
+        ""|default)
+            ;;
+        acceptEdits)
+            CODEX_CLI_APPROVAL_POLICY="never"
+            CODEX_CLI_CONFIG_LABEL="never approval, workspace-write sandbox"
+            ;;
+        bypassPermissions)
+            CODEX_CLI_APPROVAL_POLICY="never"
+            CODEX_CLI_SANDBOX_MODE="danger-full-access"
+            CODEX_CLI_CONFIG_LABEL="never approval, danger-full-access sandbox"
+            ;;
+        *)
+            echo "[bootstrap] Warning: invalid HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE; using default Codex CLI config"
+            ;;
+    esac
+
+    cat > "$CLAUDE_HOME/.codex/config.toml" <<TOML
+approval_policy = "$CODEX_CLI_APPROVAL_POLICY"
+sandbox_mode = "$CODEX_CLI_SANDBOX_MODE"
 
 [features]
 codex_hooks = true
 TOML
-    echo "[bootstrap] Created Codex CLI config (on-request approval, workspace-write sandbox, hooks enabled)"
+    echo "[bootstrap] Created Codex CLI config ($CODEX_CLI_CONFIG_LABEL, hooks enabled)"
 elif ! grep -q '^\[features\]' "$CLAUDE_HOME/.codex/config.toml"; then
     printf '\n[features]\ncodex_hooks = true\n' >> "$CLAUDE_HOME/.codex/config.toml"
     echo "[bootstrap] Added [features] section to existing Codex config"

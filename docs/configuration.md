@@ -23,7 +23,7 @@ Docker Compose also supports a local `.env` file for variable interpolation. Hol
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HOLYCLAUDE_HOST_PORT` | `3001` | Host port mapped to container port `3001` |
+| `HOLYCLAUDE_HOST_PORT` | `3001` | Localhost port mapped to container port `3001` |
 | `HOLYCLAUDE_HOST_CLAUDE_DIR` | `./data/claude` | Host path bind-mounted to `/home/claude/.claude` |
 | `HOLYCLAUDE_HOST_WORKSPACE_DIR` | `./workspace` | Host path bind-mounted to `/workspace` |
 
@@ -63,6 +63,8 @@ Only needed if your volumes are on a network share (Samba, NAS, etc.):
 
 HolyClaude uses [Apprise](https://github.com/caronc/apprise) for notifications, supporting 100+ services including Discord, Telegram, Slack, Email, Pushover, Gotify, and more.
 
+Claude Code hooks, raw CLI hooks for Codex and Gemini CLI, and CloudCLI Codex chat completion/failure events use this same Apprise setup. Permission prompts are not sent through Apprise.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NOTIFY_DISCORD` | *(unset)* | Discord webhook — `discord://webhook_id/webhook_token` |
@@ -92,6 +94,17 @@ Claude Code can authenticate via web UI (OAuth) or `ANTHROPIC_API_KEY`. Other AI
 | `OPENAI_API_KEY` | (unset) | OpenAI API key |
 | `CURSOR_API_KEY` | (unset) | Cursor API key |
 
+### Codex Permission Modes
+
+HolyClaude provides configurable near-parity permission modes for Codex. These settings are intentionally split because CloudCLI Codex chat and the raw `codex` CLI read configuration through different paths.
+
+| Variable | Default | Valid values | Applies to | Behavior |
+|----------|---------|--------------|------------|----------|
+| `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE` | `acceptEdits` | `default`, `acceptEdits`, `bypassPermissions` | CloudCLI Codex chat | Runtime container config read by the CloudCLI Codex provider. Recreate the container after changing it. |
+| `HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE` | `default` | `default`, `acceptEdits`, `bypassPermissions` | Raw `codex` CLI | First-boot-only seed for new `~/.codex/config.toml`. Existing configs are not overwritten, and the generated value persists until you edit the file. |
+
+`acceptEdits` is the recommended value for both settings. `bypassPermissions` gives Codex full access with no approval. Docker still limits access to the container and mounted volumes, but anything reachable through `/workspace`, `/home/claude`, and other mounts can be read or changed. Use bypass only for trusted local workspaces.
+
 ---
 
 ## Volumes
@@ -108,6 +121,7 @@ Claude Code can authenticate via web UI (OAuth) or `ANTHROPIC_API_KEY`. Other AI
 | `settings.json` | Claude Code settings (permissions, hooks, model) |
 | `CLAUDE.md` | Claude's global memory — customize with your preferences |
 | `.credentials.json` | Anthropic API authentication (auto-created) |
+| `.codex/config.toml` | Raw Codex CLI config, created on first boot if missing |
 | `.holyclaude-bootstrapped` | Sentinel file — delete to re-run first-boot setup |
 
 ---
@@ -116,7 +130,7 @@ Claude Code can authenticate via web UI (OAuth) or `ANTHROPIC_API_KEY`. Other AI
 
 | Port | Service | Default State |
 |------|---------|--------------|
-| `3001` | CloudCLI web UI | Exposed |
+| `127.0.0.1:3001` | CloudCLI web UI | Exposed on the Docker host only |
 | `3000` | Dev server (Next.js, Express) | Commented out |
 | `4321` | Astro dev server | Commented out |
 | `5173` | Vite dev server | Commented out |
@@ -124,7 +138,7 @@ Claude Code can authenticate via web UI (OAuth) or `ANTHROPIC_API_KEY`. Other AI
 | `9229` | Node.js debugger | Commented out |
 | `1455` | Codex auth callback | Commented out |
 
-Uncomment additional ports in `docker-compose.full.yaml` as needed. If you use Codex's callback flow from your host browser, also uncomment `1455:1455`.
+Uncomment additional ports in `docker-compose.full.yaml` as needed. Keep them bound to `127.0.0.1` unless you have a private tunnel or access proxy in front of them. If you use Codex's callback flow from your host browser, also uncomment `127.0.0.1:1455:1455`.
 
 ---
 
@@ -140,7 +154,7 @@ security_opt:
   - seccomp=unconfined  # Chromium syscall requirements
 ```
 
-These are standard for any Chromium-in-Docker setup. Without them, Chromium crashes on startup.
+These are common for Chromium-in-Docker setups. Without them, Chromium may crash on startup. They also reduce container isolation, so avoid publishing the web UI directly to a public interface.
 
 ---
 
@@ -161,7 +175,7 @@ The default `settings.json` at `~/.claude/settings.json`:
 ```json
 {
   "permissions": {
-    "defaultMode": "allowEdits"
+    "defaultMode": "acceptEdits"
   },
   "env": {
     "DISABLE_AUTOUPDATER": "1"
@@ -175,7 +189,7 @@ The default `settings.json` at `~/.claude/settings.json`:
 | Mode | File edits | Shell commands | Use case |
 |------|-----------|----------------|----------|
 | `askUser` | Asks | Asks | Maximum safety |
-| `allowEdits` | Allowed | Asks | **Default** — good balance |
+| `acceptEdits` | Allowed | Depends on Claude Code's current prompt behavior | **Default** — shipped setting |
 | `bypassPermissions` | Allowed | Allowed | Power users only |
 
 ### Changing the Model

@@ -44,6 +44,25 @@ if ! runuser -u "$CLAUDE_USER" -- test -w "$WORKSPACE_DIR"; then
     echo "[entrypoint] WARNING: /workspace is still not writable; fix host ownership or PUID/PGID"
 fi
 
+# ---------- Repair bubblewrap setuid permissions ----------
+BWRAP_BIN="/usr/bin/bwrap"
+if [ -x "$BWRAP_BIN" ]; then
+    bwrap_mode="$(stat -c "%a %u %g" "$BWRAP_BIN" 2>/dev/null || true)"
+    if [ "$bwrap_mode" != "4755 0 0" ]; then
+        echo "[entrypoint] Repairing bubblewrap setuid permissions"
+        chown root:root "$BWRAP_BIN" 2>/dev/null || true
+        chmod 4755 "$BWRAP_BIN" 2>/dev/null || true
+        bwrap_mode="$(stat -c "%a %u %g" "$BWRAP_BIN" 2>/dev/null || true)"
+    fi
+
+    if [ "$bwrap_mode" != "4755 0 0" ]; then
+        final_mode="${bwrap_mode:-missing}"
+        echo "[entrypoint] WARNING: /usr/bin/bwrap mode is ${final_mode:-missing}, expected 4755 0 0; Codex sandbox may fail on restricted kernels"
+    fi
+else
+    echo "[entrypoint] WARNING: /usr/bin/bwrap is missing or not executable; Codex sandbox may fail"
+fi
+
 # ---------- Codex CLI config symlink (every boot) ----------
 mkdir -p "$CLAUDE_HOME/.claude/.codex"
 chown "$PUID:$PGID" "$CLAUDE_HOME/.claude/.codex"

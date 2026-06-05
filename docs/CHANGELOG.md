@@ -4,6 +4,40 @@ All notable changes to HolyClaude will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.6] - 05/28/2026
+
+### Added
+- Added configurable near-parity Codex permission modes for CloudCLI Codex chat with `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE`.
+- Added first-boot raw `codex` CLI permission-mode seeding through `HOLYCLAUDE_CODEX_CLI_PERMISSION_MODE`.
+
+### Changed
+- Documented Codex permission behavior, safety caveats, compose examples, and CloudCLI modification notices.
+
+## [1.2.5] - 05/27/2026
+
+### Fixed
+- Sent Apprise notifications for Codex chat completion/failure events through HolyClaude's CloudCLI provider lifecycle, using the existing ~/.claude/notify-on flag and NOTIFY_* destinations.
+
+## [1.2.4] - 05/27/2026
+
+### Fixed
+- Repaired bubblewrap setuid permissions at container startup so Codex `apply_patch` keeps working on Synology and other restricted-user-namespace hosts after `docker compose pull && docker compose up -d`.
+
+## [1.2.3] - 05/27/2026
+
+### Changed
+- Refreshed dependency surfaces with Node.js 26.2.0, s6-overlay 3.2.3.0, pinned npm and Python package versions, pinned GitHub Actions, and pinned CloudCLI plugin SHAs.
+- Retained CloudCLI 1.26.3 after rejecting the 2.0.0 artifact because required HolyClaude patches could not be carried forward safely.
+- Recorded site dependency and copy updates as follow-up only, with no site commit included in this release.
+
+### Fixed
+- Changed required CloudCLI patch misses to fail closed during the image build instead of continuing after warnings.
+- Corrected third-party notices and `acceptEdits` documentation drift across source docs and templates.
+
+### Security
+- Bound default CloudCLI compose examples to localhost only and strengthened guidance against public port exposure.
+- Hardened ignore and build-context handling for local state and secret-bearing files.
+
 ## [1.2.2-jhangyu.3] - 05/03/2026
 
 ### Fixed
