@@ -88,7 +88,7 @@ Claude Code can authenticate via web UI (OAuth) or `ANTHROPIC_API_KEY`. Other AI
 | `ANTHROPIC_API_KEY` | (unset) | Anthropic API key (alternative to web UI OAuth) |
 | `ANTHROPIC_AUTH_TOKEN` | (unset) | Anthropic auth token (alternative to API key). For Ollama, set this to `ollama` |
 | `ANTHROPIC_BASE_URL` | (unset) | Custom Anthropic API endpoint (proxies, private deployments, or Ollama's Anthropic-compatible API) |
-| `CLAUDE_CODE_USE_FOUNDRY` | `1` | Use Claude Code's Foundry-compatible backend path for Anthropic-compatible providers |
+| `CLAUDE_CODE_USE_FOUNDRY` | (unset) | Use Claude Code's Foundry-compatible backend path for Anthropic-compatible providers |
 | `CLAUDE_CODE_USE_BEDROCK` | (unset) | Set to `1` to use Amazon Bedrock backend |
 | `CLAUDE_CODE_USE_VERTEX` | (unset) | Set to `1` to use Google Vertex AI backend |
 | `GEMINI_API_KEY` | (unset) | Google Gemini API key |

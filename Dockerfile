@@ -56,7 +56,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage" \
     CHROME_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    CLAUDE_CODE_USE_FOUNDRY=1 \
     npm_config_audit=false \
     npm_config_fund=false \
     npm_config_update_notifier=false
