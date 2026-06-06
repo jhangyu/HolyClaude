@@ -117,12 +117,10 @@ if [ ! -f "$SENTINEL" ]; then
     fi
 fi
 
-# ---------- Background: persist ~/.claude.json every 60s ----------
-(while true; do
-    sleep 60
-    [ -f "$CLAUDE_HOME/.claude.json" ] && cp "$CLAUDE_HOME/.claude.json" "$CLAUDE_HOME/.claude/.claude.json.persist" 2>/dev/null
-done) &
-
 # ---------- Hand off to s6-overlay ----------
+# Note: ~/.claude.json persistence is now handled by the s6 `claude-persist`
+# longrun service (s6-overlay/s6-rc.d/claude-persist/) so it is supervised and
+# survives any process termination. The previous inline background loop was
+# removed in #6.
 echo "[entrypoint] Starting s6-overlay..."
 exec /init "$@"

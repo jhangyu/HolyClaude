@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Persist ~/.claude.json to the bind-mounted .claude directory every
+# CLAUDE_PERSIST_INTERVAL seconds (default 60). Runs as the `claude` user
+# so it can read/write the file. s6-overlay supervises this longrun service
+# and restarts it automatically on exit.
+exec s6-setuidgid claude bash <<'PERSIST_SCRIPT'
+CLAUDE_HOME="/home/claude"
+PERSIST_INTERVAL="${CLAUDE_PERSIST_INTERVAL:-60}"
+while true; do
+    sleep "$PERSIST_INTERVAL"
+    [ -f "$CLAUDE_HOME/.claude.json" ] && cp "$CLAUDE_HOME/.claude.json" "$CLAUDE_HOME/.claude/.claude.json.persist" 2>/dev/null
+done
+PERSIST_SCRIPT

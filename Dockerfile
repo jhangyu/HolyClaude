@@ -1,6 +1,6 @@
 # ==============================================================================
 # HolyClaude — Pre-configured Docker Environment for Claude Code CLI + CloudCLI
-# https://github.com/coderluii/holyclaude
+# https://github.com/jhangyu/holyclaude
 #
 # Build variants:
 #   docker build -t holyclaude .                        # full (default)
@@ -58,7 +58,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     npm_config_audit=false \
     npm_config_fund=false \
-    npm_config_update_notifier=false
+    npm_config_update_notifier=false \
+    CLAUDE_CODE_ATTRIBUTION_HEADER=0
 
 # ---------- System packages, external CLIs, s6-overlay ----------
 RUN set -eux; \
@@ -121,13 +122,7 @@ RUN set -eux; \
 USER root
 ENV PATH="/home/claude/.local/bin:${PATH}"
 
-COPY scripts/fix-cloudcli-session-titles.py /usr/local/bin/fix-cloudcli-session-titles.py
-COPY scripts/patch-cloudcli-shell-scroll.mjs /usr/local/bin/patch-cloudcli-shell-scroll.mjs
-COPY scripts/patch-cloudcli-apprise-notifications.mjs /usr/local/bin/patch-cloudcli-apprise-notifications.mjs
-COPY scripts/patch-cloudcli-codex-permissions.mjs /usr/local/bin/patch-cloudcli-codex-permissions.mjs
-RUN chmod +x /usr/local/bin/fix-cloudcli-session-titles.py
-
-# ---------- npm global packages ----------
+# ---------- npm global packages (non-fork portion only) ----------
 RUN set -eux; \
     packages="\
       typescript tsx \
@@ -154,31 +149,11 @@ RUN set -eux; \
         opencode-ai"; \
     fi; \
     npm i -g --omit=dev --no-audit --no-fund $packages; \
+    mkdir -p /home/claude/.local/bin && \
+    ln -sf /usr/local/bin/claude /home/claude/.local/bin/claude && \
+    chown -R claude:claude /home/claude/.local && \
     touch /usr/local/lib/node_modules/@cloudcli-ai/cloudcli/.env; \
     ln -sf /usr/local/bin/cloudcli /usr/local/bin/claude-code-ui; \
-    python3 /usr/local/bin/fix-cloudcli-session-titles.py --mode build; \
-    CLOUDCLI_ROOT="/usr/local/lib/node_modules/@cloudcli-ai/cloudcli"; \
-    CLOUDCLI_CODEX="$CLOUDCLI_ROOT/dist-server/server/openai-codex.js"; \
-    CLOUDCLI_NOTIFICATIONS="$CLOUDCLI_ROOT/dist-server/server/services/notification-orchestrator.js"; \
-    CLOUDCLI_COMMANDS="$CLOUDCLI_ROOT/dist-server/server/routes/commands.js"; \
-    CLOUDCLI_WS_PROXY="$CLOUDCLI_ROOT/dist-server/server/modules/websocket/services/plugin-websocket-proxy.service.js"; \
-    grep -Fq "upstream.on('message', (data, isBinary) =>" "$CLOUDCLI_WS_PROXY"; \
-    grep -Fq "clientWs.send(data, { binary: isBinary })" "$CLOUDCLI_WS_PROXY"; \
-    grep -Fq "clientWs.on('message', (data, isBinary) =>" "$CLOUDCLI_WS_PROXY"; \
-    grep -Fq "upstream.send(data, { binary: isBinary })" "$CLOUDCLI_WS_PROXY"; \
-    echo "[patch] CloudCLI WebSocket binary frame fix already present"; \
-    CLOUDCLI_BUNDLE="$(find "$CLOUDCLI_ROOT/dist/assets" -maxdepth 1 -type f -name 'index-*.js' | head -n 1)"; \
-    test -n "$CLOUDCLI_BUNDLE"; \
-    node /usr/local/bin/patch-cloudcli-shell-scroll.mjs "$CLOUDCLI_BUNDLE"; \
-    grep -Fq 'action: "models"' "$CLOUDCLI_COMMANDS"; \
-    grep -Fq "setClaudeModel:" "$CLOUDCLI_BUNDLE"; \
-    grep -Fq 'localStorage.setItem("claude-model"' "$CLOUDCLI_BUNDLE"; \
-    grep -Fq "availableOptions" "$CLOUDCLI_BUNDLE"; \
-    echo "[patch] CloudCLI Claude model selection flow already present"; \
-    node /usr/local/bin/patch-cloudcli-apprise-notifications.mjs "$CLOUDCLI_NOTIFICATIONS"; \
-    node /usr/local/bin/patch-cloudcli-codex-permissions.mjs "$CLOUDCLI_CODEX"; \
-    node --check "$CLOUDCLI_NOTIFICATIONS"; \
-    node --check "$CLOUDCLI_CODEX"; \
     npm cache clean --force; \
     find /usr/local/lib/node_modules -type f -name '*.map' -delete; \
     find /usr/local/lib/node_modules -type d \( \
@@ -213,35 +188,35 @@ RUN set -eux; \
     \) -prune -exec rm -rf {} +; \
     rm -rf /root/.cache/pip /tmp/*
 
-# ---------- CloudCLI plugins (baked into image) ----------
+# ---------- CloudCLI plugins (baked into image) + fork install staging ----------
 COPY --from=cloudcli-plugin-builder --chown=claude:claude /plugins /home/claude/.claude-code-ui/plugins
+COPY scripts/ /tmp/scripts/
+COPY config/ /tmp/config/
+COPY scripts/build/ /tmp/build-scripts/
+
+# ---------- Apply fork patches, plugins, and config (extracted to scripts/build/) ----------
 RUN set -eux; \
-    echo '{"project-stats":{"name":"project-stats","source":"https://github.com/cloudcli-ai/cloudcli-plugin-starter","enabled":true},"web-terminal":{"name":"web-terminal","source":"https://github.com/cloudcli-ai/cloudcli-plugin-terminal","enabled":true}}' > /home/claude/.claude-code-ui/plugins.json; \
-    chown claude:claude /home/claude/.claude-code-ui/plugins.json
+    bash /tmp/build-scripts/install-patches.sh && \
+    bash /tmp/build-scripts/install-plugins.sh && \
+    bash /tmp/build-scripts/install-config.sh && \
+    rm -rf /tmp/scripts /tmp/config /tmp/build-scripts
 
 # ---------- Store variant for bootstrap ----------
 RUN echo "${VARIANT}" > /etc/holyclaude-variant
-
-# ---------- Copy config files ----------
-COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY scripts/bootstrap.sh /usr/local/bin/bootstrap.sh
-COPY scripts/notify.py /usr/local/bin/notify.py
-COPY config/settings.json /usr/local/share/holyclaude/settings.json
-COPY config/claude-memory-full.md /usr/local/share/holyclaude/claude-memory-full.md
-COPY config/claude-memory-slim.md /usr/local/share/holyclaude/claude-memory-slim.md
-RUN chmod +x /usr/local/bin/entrypoint.sh \
-    /usr/local/bin/bootstrap.sh \
-    /usr/local/bin/notify.py
 
 # ---------- s6-overlay service definitions ----------
 COPY s6-overlay/s6-rc.d/cloudcli/type /etc/s6-overlay/s6-rc.d/cloudcli/type
 COPY s6-overlay/s6-rc.d/cloudcli/run /etc/s6-overlay/s6-rc.d/cloudcli/run
 COPY s6-overlay/s6-rc.d/xvfb/type /etc/s6-overlay/s6-rc.d/xvfb/type
 COPY s6-overlay/s6-rc.d/xvfb/run /etc/s6-overlay/s6-rc.d/xvfb/run
+COPY s6-overlay/s6-rc.d/claude-persist/type /etc/s6-overlay/s6-rc.d/claude-persist/type
+COPY s6-overlay/s6-rc.d/claude-persist/run  /etc/s6-overlay/s6-rc.d/claude-persist/run
 RUN chmod +x /etc/s6-overlay/s6-rc.d/cloudcli/run \
-    /etc/s6-overlay/s6-rc.d/xvfb/run && \
+    /etc/s6-overlay/s6-rc.d/xvfb/run \
+    /etc/s6-overlay/s6-rc.d/claude-persist/run && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/cloudcli && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/xvfb
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/xvfb && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/claude-persist
 
 # ---------- Working directory ----------
 WORKDIR /workspace
