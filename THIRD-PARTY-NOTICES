@@ -63,7 +63,7 @@ for their source and license files.
 
 - License: MIT
 - Source: https://github.com/nodejs/node
-- Version: 26.2.0 base image
+- Version: 26.3.0 base image
 
 For a complete list of installed packages and their licenses, inspect the
 Docker image directly or refer to the Dockerfile.
