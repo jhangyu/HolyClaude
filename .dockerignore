@@ -13,9 +13,6 @@ docs/
 # Assets (logo, screenshots)
 assets/
 
-# Local release artifacts (not used by Dockerfile)
-vendor/
-
 # Runtime data (should never be in build context)
 data/
 workspace/
@@ -30,3 +27,8 @@ workspace/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

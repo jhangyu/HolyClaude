@@ -34,61 +34,60 @@ a hard-coded filename.
 
 ## Upstream HolyClaude Patch Compatibility
 
-Upstream `CoderLuii/HolyClaude` currently carries patches against vendored
-`@siteboon/claude-code-ui@1.26.3`. Those patches are not directly portable by
-path because this fork installs `@cloudcli-ai/cloudcli` from npm.
+This fork consumes `@cloudcli-ai/cloudcli` exclusively from npm; no vendored
+tarballs or forked package copies are shipped in the image. Upstream
+`CoderLuii/HolyClaude` historically patched a vendored `@siteboon/claude-code-ui`
+artifact, but those vendored sources are not used here, so the upstream path
+references are intentionally omitted from this matrix. Compatibility is
+re-asserted against the installed npm package in the `Applied Or Verified Fixes`
+table above.
 
 | Upstream patch | Upstream target | Current compatibility notes |
 | --- | --- | --- |
-| WebSocket plugin proxy binary relay | `server/index.js` in `@siteboon/claude-code-ui` | Equivalent behavior is already present in `@cloudcli-ai/cloudcli@1.33.1`, but the code moved to `dist-server/server/modules/websocket/services/plugin-websocket-proxy.service.js`. |
-| Shell tab scroll position | Minified browser bundle `dist/assets/index-X3ImjnMV.js` | Still needed. Equivalent anchor in `@cloudcli-ai/cloudcli@1.33.1` is `const D=()=>{x.current?.focus()}` in the discovered main bundle. |
-| `/model` newModel propagation | `server/routes/commands.js` and minified bundle | Equivalent behavior is already present in `@cloudcli-ai/cloudcli@1.33.1`; the Docker build verifies the current route and bundle anchors instead of applying the older minified patch. |
-| Codex lifecycle Apprise notifications | `server/services/notification-orchestrator.js` | Ported to the current `dist-server/server/services/notification-orchestrator.js` layout. |
-| Codex chat permission mode | `server/openai-codex.js` | Ported to the current `dist-server/server/openai-codex.js` layout. |
+| WebSocket plugin proxy binary relay | (vendored upstream package, not used in this fork) | Equivalent behavior is already present in `@cloudcli-ai/cloudcli@1.33.1`, verified against `dist-server/server/modules/websocket/services/plugin-websocket-proxy.service.js`. |
+| Shell tab scroll position | (vendored upstream package, not used in this fork) | Applied to the npm-installed CloudCLI main bundle; anchor is `const D=()=>{x.current?.focus()}` followed by `scrollToLine(_vp)` in the discovered main bundle. |
+| `/model` newModel propagation | (vendored upstream package, not used in this fork) | Equivalent behavior is already present in `@cloudcli-ai/cloudcli@1.33.1`; the Docker build verifies the current route and bundle anchors instead of applying the older minified patch. |
+| Codex lifecycle Apprise notifications | (vendored upstream package, not used in this fork) | Ported to the current `dist-server/server/services/notification-orchestrator.js` layout. |
+| Codex chat permission mode | (vendored upstream package, not used in this fork) | Ported to the current `dist-server/server/openai-codex.js` layout. |
 
 ## Probe Commands
 
-The last local probe used:
+The probe verification logic has been extracted from the Dockerfile into
+[`scripts/build/install-patches.sh`](../scripts/build/install-patches.sh).
+That script runs fail-closed `grep` checks during the image build to confirm
+the expected CloudCLI surface is in place, and then runs the actual patches.
+
+Key probe anchors (from `scripts/build/install-patches.sh`):
 
 ```bash
-docker build --build-arg VARIANT=slim -t holyclaude:cloudcli-1.33.1-probe .
-docker run --rm --entrypoint /bin/bash holyclaude:cloudcli-1.33.1-probe -lc '
-  ROOT=/usr/local/lib/node_modules/@cloudcli-ai/cloudcli
-  BUNDLE=$(find "$ROOT/dist/assets" -maxdepth 1 -type f -name "index-*.js" | head -n 1)
-  echo "version=$(node -p "require(\"$ROOT/package.json\").version")"
-  echo "bundle=$BUNDLE"
-  grep -F "scrollToLine(_vp)" "$BUNDLE" >/dev/null && echo "shell_scroll=present"
-  WS="$ROOT/dist-server/server/modules/websocket/services/plugin-websocket-proxy.service.js"
-  grep -F "clientWs.send(data, { binary: isBinary })" "$WS" >/dev/null
-  grep -F "upstream.send(data, { binary: isBinary })" "$WS" >/dev/null
-  echo "websocket_binary=present"
-  CODEX="$ROOT/dist-server/server/openai-codex.js"
-  NOTIFY="$ROOT/dist-server/server/services/notification-orchestrator.js"
-  SESSION="$ROOT/dist-server/server/modules/providers/list/claude/claude-session-synchronizer.provider.js"
-  grep -F "sendAppriseLifecycleNotification" "$NOTIFY" >/dev/null && echo "apprise_lifecycle=present"
-  grep -F "HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE" "$CODEX" >/dev/null && echo "codex_permission=present"
-  grep -F "setClaudeModel:" "$BUNDLE" >/dev/null
-  grep -F "availableOptions" "$BUNDLE" >/dev/null && echo "model_flow=present"
-  grep -F "extractMeaningfulUserText" "$SESSION" >/dev/null && echo "session_titles=present"
-  node --check "$BUNDLE" && echo "bundle_syntax=ok"
-  node --check "$NOTIFY"
-  node --check "$CODEX"
-  node --check "$SESSION"
-'
+# ---------- Locate CloudCLI install paths ----------
+CLOUDCLI_ROOT="/usr/local/lib/node_modules/@cloudcli-ai/cloudcli"
+CLOUDCLI_CODEX="$CLOUDCLI_ROOT/dist-server/server/openai-codex.js"
+CLOUDCLI_NOTIFICATIONS="$CLOUDCLI_ROOT/dist-server/server/services/notification-orchestrator.js"
+CLOUDCLI_COMMANDS="$CLOUDCLI_ROOT/dist-server/server/routes/commands.js"
+CLOUDCLI_WS_PROXY="$CLOUDCLI_ROOT/dist-server/server/modules/websocket/services/plugin-websocket-proxy.service.js"
+
+# ---------- Probe: WebSocket binary frame fix (must already be present upstream) ----------
+grep -Fq "upstream.on('message', (data, isBinary) =>" "$CLOUDCLI_WS_PROXY"
+grep -Fq "clientWs.send(data, { binary: isBinary })" "$CLOUDCLI_WS_PROXY"
+grep -Fq "clientWs.on('message', (data, isBinary) =>" "$CLOUDCLI_WS_PROXY"
+grep -Fq "upstream.send(data, { binary: isBinary })" "$CLOUDCLI_WS_PROXY"
+echo "[patch] CloudCLI WebSocket binary frame fix already present"
+
+# ---------- Probe: Claude model selection flow (must already be present upstream) ----------
+grep -Fq 'action: "models"' "$CLOUDCLI_COMMANDS"
+grep -Fq "setClaudeModel:" "$CLOUDCLI_BUNDLE"
+grep -Fq 'localStorage.setItem("claude-model"' "$CLOUDCLI_BUNDLE"
+grep -Fq "availableOptions" "$CLOUDCLI_BUNDLE"
+echo "[patch] CloudCLI Claude model selection flow already present"
 ```
 
-Expected output includes:
-
-```text
-version=1.33.1
-shell_scroll=present
-websocket_binary=present
-apprise_lifecycle=present
-codex_permission=present
-model_flow=present
-session_titles=present
-bundle_syntax=ok
-```
+The shell-scroll, apprise, codex-permission, and session-title verifications
+are not probe checks — they are applied by the patch scripts
+(`patch-cloudcli-shell-scroll.mjs`, `patch-cloudcli-apprise-notifications.mjs`,
+`patch-cloudcli-codex-permissions.mjs`, `fix-cloudcli-session-titles.py`)
+invoked from `install-patches.sh`, and they are followed by
+`node --check` syntax validation of the touched files.
 
 ## Maintenance Rules
 
