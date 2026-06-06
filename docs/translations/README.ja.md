@@ -721,7 +721,7 @@ holyclaude/
 ├── s6-overlay/              # プロセス監視（s6-rc サービス）
 ├── Dockerfile               # シングルステージビルド
 ├── docker-compose.yaml      # クイックスタート（最小設定）
-├── docker-compose.full.yaml # フル設定（全オプション）
+├── docker-compose.override.yaml.example # フル設定のオーバーライドテンプレート（docker-compose.override.yaml にコピーして有効化）
 ├── LICENSE
 └── README.md
 ```

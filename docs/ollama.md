@@ -12,7 +12,7 @@ This means you can use HolyClaude with local models (free, unlimited) or Ollama 
 
 ## Setup
 
-Use `docker-compose.full.yaml` as the supported Ollama setup path and add the Ollama-specific lines below:
+Use `docker-compose.override.yaml` (copy from `docker-compose.override.yaml.example`) as the supported Ollama setup path and add the Ollama-specific lines below:
 
 ```yaml
 services:

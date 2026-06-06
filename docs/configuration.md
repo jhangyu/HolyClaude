@@ -11,13 +11,13 @@ HolyClaude ships with two compose files:
 | File | Purpose | Usage |
 |------|---------|-------|
 | `docker-compose.yaml` | Quick start — minimal config, just works | `docker compose up -d` |
-| `docker-compose.full.yaml` | All options — ports, API keys, polling, notifications | `docker compose -f docker-compose.full.yaml up -d` |
+| `docker-compose.override.yaml` | All options — ports, API keys, polling, notifications (copy from `docker-compose.override.yaml.example`) | `cp docker-compose.override.yaml.example docker-compose.override.yaml && docker compose up -d` |
 
 ---
 
 ## Environment Variables
 
-Docker Compose also supports a local `.env` file for variable interpolation. HolyClaude uses that in `docker-compose.full.yaml` for host-side port and bind-mount paths. These values are read by Compose on the host and are not passed into the container unless you also list them under `environment:`.
+Docker Compose also supports a local `.env` file for variable interpolation. HolyClaude uses that in `docker-compose.override.yaml` for host-side port and bind-mount paths. These values are read by Compose on the host and are not passed into the container unless you also list them under `environment:`.
 
 ### Compose-Level Host Mappings
 
@@ -139,7 +139,7 @@ HolyClaude provides configurable near-parity permission modes for Codex. These s
 | `9229` | Node.js debugger | Commented out |
 | `1455` | Codex auth callback | Commented out |
 
-Uncomment additional ports in `docker-compose.full.yaml` as needed. Keep them bound to `127.0.0.1` unless you have a private tunnel or access proxy in front of them. If you use Codex's callback flow from your host browser, also uncomment `127.0.0.1:1455:1455`.
+Uncomment additional ports in `docker-compose.override.yaml` as needed. Keep them bound to `127.0.0.1` unless you have a private tunnel or access proxy in front of them. If you use Codex's callback flow from your host browser, also uncomment `127.0.0.1:1455:1455`.
 
 ---
 

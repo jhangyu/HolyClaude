@@ -721,7 +721,7 @@ holyclaude/
 ├── s6-overlay/              # Process supervision (s6-rc services)
 ├── Dockerfile               # Single-stage build
 ├── docker-compose.yaml      # Quick start (minimal config)
-├── docker-compose.full.yaml # Full config (all options)
+├── docker-compose.override.yaml.example # Full config override (copy to docker-compose.override.yaml to enable)
 ├── LICENSE
 └── README.md
 ```

@@ -1,7 +1,18 @@
 # ==============================================================================
-# HolyClaude — Full Configuration
-# Usage: docker compose -f docker-compose.full.yaml up -d
-# All options documented: https://github.com/CoderLuii/HolyClaude/blob/master/docs/configuration.md
+# HolyClaude — Full Configuration (Compose override example)
+#
+# This file is a Docker Compose override example.
+# Copy it to `docker-compose.override.yaml` (same directory) and Docker Compose
+# will automatically merge it on top of `docker-compose.yaml`.
+# The override adds extra bind-mounts, ports, and environment variables
+# for users who want the full configuration.
+#
+# Usage:
+#   cp docker-compose.override.yaml.example docker-compose.override.yaml
+#   docker compose up -d
+#
+# All options documented:
+#   https://github.com/CoderLuii/HolyClaude/blob/master/docs/configuration.md
 # ==============================================================================
 
 services:

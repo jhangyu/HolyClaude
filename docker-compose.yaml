@@ -6,7 +6,7 @@
 
 services:
   holyclaude:
-    image: coderluii/holyclaude:latest
+    image: jhangyu/holyclaude:latest
     container_name: holyclaude
     hostname: holyclaude
     restart: unless-stopped

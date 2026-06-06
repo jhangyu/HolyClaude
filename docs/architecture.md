@@ -137,7 +137,7 @@ Baking them into the Dockerfile ensures a clean, controlled build environment.
 
 ### Why no `.env` file by default?
 
-Every configuration option has a sensible default. Most users authenticate through the CloudCLI web UI, not environment variables. Requiring a `.env` file adds a setup step that most users don't need. Power users can use `docker-compose.full.yaml` which has all options documented inline.
+Every configuration option has a sensible default. Most users authenticate through the CloudCLI web UI, not environment variables. Requiring a `.env` file adds a setup step that most users don't need. Power users can use `docker-compose.override.yaml` (copy from `docker-compose.override.yaml.example`) which has all options documented inline.
 
 ### Why bind mounts instead of named volumes?
 

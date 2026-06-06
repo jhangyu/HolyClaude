@@ -63,7 +63,7 @@ If you're adding a new tool or package, decide which variant it belongs to. Full
 |------|-------------|
 | `Dockerfile` | Single-stage build with full/slim split via `VARIANT` build arg |
 | `docker-compose.yaml` | Minimal quick-start compose |
-| `docker-compose.full.yaml` | Full compose with all options documented |
+| `docker-compose.override.yaml.example` | Full compose override template (copy to `docker-compose.override.yaml` to enable) |
 | `scripts/entrypoint.sh` | UID/GID remapping, workspace fix, triggers bootstrap, hands off to s6-overlay |
 | `scripts/bootstrap.sh` | First-boot only: copies settings and memory template, configures git |
 | `scripts/notify.py` | Apprise notification helper for stop/error hooks |

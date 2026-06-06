@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKERHUB_IMAGE: coderluii/holyclaude
-  GHCR_IMAGE: ghcr.io/coderluii/holyclaude
+  DOCKERHUB_IMAGE: jhangyu/holyclaude
+  GHCR_IMAGE: ghcr.io/jhangyu/holyclaude
 
 jobs:
   build-and-push:
@@ -97,6 +97,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: coderluii/holyclaude
+          repository: jhangyu/holyclaude
           short-description: "AI coding workstation: Claude Code + web UI + 7 AI CLIs + headless browser + 50+ tools"
           readme-filepath: ./docs/dockerhub-description.md

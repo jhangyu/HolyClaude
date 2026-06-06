@@ -232,7 +232,7 @@ Two flavors. Same quality. Pick your weight class.
 docker pull jhangyu/holyclaude
 
 # Slim — lean and mean
-docker pull coderluii/holyclaude:slim
+docker pull jhangyu/holyclaude:slim
 ```
 
 > **`latest` is always the full image.** Slim users: don't worry — when you ask Claude to do something that needs a missing tool, it installs it in seconds. You get the same capabilities, just with a smaller initial download.
@@ -740,7 +740,7 @@ holyclaude/
 ├── s6-overlay/              # Process supervision (s6-rc services)
 ├── Dockerfile               # Single-stage build
 ├── docker-compose.yaml      # Quick start (minimal config)
-├── docker-compose.full.yaml # Full config (all options)
+├── docker-compose.override.yaml.example # Full config override (copy to docker-compose.override.yaml to enable)
 ├── LICENSE
 └── README.md
 ```
@@ -948,7 +948,7 @@ Your data persists in `./data/claude` and `./workspace` — upgrading only repla
 To pin a specific version instead of `latest`:
 
 ```yaml
-image: coderluii/holyclaude:1.1.2   # instead of :latest
+image: jhangyu/holyclaude:1.1.2   # instead of :latest
 ```
 
 <p align="right">
