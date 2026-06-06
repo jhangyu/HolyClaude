@@ -141,7 +141,7 @@ RUN set -eux; \
       @google/gemini-cli \
       @openai/codex@0.137.0 \
       task-master-ai \
-      @cloudcli-ai/cloudcli@1.33.0"; \
+      @cloudcli-ai/cloudcli@1.33.1"; \
     if [ "$VARIANT" = "full" ]; then \
       packages="$packages \
         wrangler vercel netlify-cli \
