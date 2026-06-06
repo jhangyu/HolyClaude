@@ -4,6 +4,20 @@ All notable changes to HolyClaude will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Fork-only changes]
+
+Entries in this section are only shipped by the `jhangyu/holyclaude` fork
+and are not part of the upstream `CoderLuii/HolyClaude` release stream.
+
+## [1.2.2-jhangyu.3] - 05/03/2026
+
+### Fixed
+- Claude Code sessions shown inside CloudCLI no longer fall back to `Untitled Claude Session` when `~/.claude/history.jsonl` lacks a matching `display` entry
+- Added a startup backfill step that repairs older CloudCLI session rows from mounted Claude transcript JSONL files when those transcripts are available in the container
+
+### Added
+- `scripts/fix-cloudcli-session-titles.py` to patch the installed CloudCLI Claude session synchronizer during image build and to backfill existing session titles at runtime
+
 ## [1.2.6] - 05/28/2026
 
 ### Added
@@ -38,14 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Bound default CloudCLI compose examples to localhost only and strengthened guidance against public port exposure.
 - Hardened ignore and build-context handling for local state and secret-bearing files.
 
-## [1.2.2-jhangyu.3] - 05/03/2026
-
-### Fixed
-- Claude Code sessions shown inside CloudCLI no longer fall back to `Untitled Claude Session` when `~/.claude/history.jsonl` lacks a matching `display` entry
-- Added a startup backfill step that repairs older CloudCLI session rows from mounted Claude transcript JSONL files when those transcripts are available in the container
-
-### Added
-- `scripts/fix-cloudcli-session-titles.py` to patch the installed CloudCLI Claude session synchronizer during image build and to backfill existing session titles at runtime
+> Fork-only changes are tracked in the `[Fork-only changes]` section at the top of this file.
 
 ## [1.2.2] - 04/10/2026
 
