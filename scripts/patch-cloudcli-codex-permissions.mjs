@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const DEFAULT_CODEX_PATH = '/usr/local/lib/node_modules/@siteboon/claude-code-ui/server/openai-codex.js';
+const DEFAULT_CODEX_PATH = '/usr/local/lib/node_modules/@cloudcli-ai/cloudcli/dist-server/server/openai-codex.js';
 const cliTargetPath = process.argv[2];
 const CODEX_PATH = cliTargetPath || DEFAULT_CODEX_PATH;
 const ERROR_MESSAGE = '[patch] ERROR: CloudCLI Codex permission mode anchors not found';
@@ -10,8 +10,6 @@ const ENV_CONSTANT = 'HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE_ENV';
 const MAP_ANCHOR = 'function mapPermissionModeToCodexOptions(permissionMode)';
 const QUERY_ANCHOR = 'export async function queryCodex(command, options = {}, ws)';
 const DESTRUCTURING_ANCHOR = "permissionMode = 'default'";
-const DESTRUCTURING_NEEDLE = "    permissionMode = 'default'\n  } = options;";
-const DESTRUCTURING_REPLACEMENT = "    permissionMode\n  } = options;";
 const WORKING_DIRECTORY_ANCHOR = '  const workingDirectory = cwd || projectPath || process.cwd();';
 const MAP_CALL_ANCHOR = 'const { sandboxMode, approvalPolicy } = mapPermissionModeToCodexOptions(permissionMode);';
 const MAP_CALL_REPLACEMENT = 'const { sandboxMode, approvalPolicy } = mapPermissionModeToCodexOptions(effectivePermissionMode);';
@@ -161,7 +159,6 @@ if (hasFullHolyClaudeRuntimeContract(source)) {
 const requiredAnchorsPresent = source.includes(MAP_ANCHOR)
   && source.includes(QUERY_ANCHOR)
   && source.includes(DESTRUCTURING_ANCHOR)
-  && source.includes(DESTRUCTURING_NEEDLE)
   && source.includes(WORKING_DIRECTORY_ANCHOR)
   && source.includes(MAP_CALL_ANCHOR);
 const mapFunctionEndIndex = findFunctionEnd(source, MAP_ANCHOR);
@@ -172,7 +169,7 @@ if (!requiredAnchorsPresent || mapFunctionEndIndex === -1) {
 }
 
 source = `${source.slice(0, mapFunctionEndIndex)}${helperCode}${source.slice(mapFunctionEndIndex)}`;
-source = source.replace(DESTRUCTURING_NEEDLE, DESTRUCTURING_REPLACEMENT);
+source = source.replace(/permissionMode = 'default'/, 'permissionMode');
 source = source.replace(
   WORKING_DIRECTORY_ANCHOR,
   "  const hasExplicitPermissionMode = Object.prototype.hasOwnProperty.call(options, 'permissionMode');\n  const effectivePermissionMode = resolveCodexChatPermissionMode(permissionMode, hasExplicitPermissionMode);\n  const workingDirectory = cwd || projectPath || process.cwd();"

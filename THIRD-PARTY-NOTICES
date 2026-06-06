@@ -16,22 +16,27 @@ independent process managed by s6-overlay.
 
 ### Modification Notice
 
-HolyClaude applies the following CloudCLI patches during the Docker build.
-The exact commands are in the Dockerfile, and missing patch anchors fail the
-build.
+HolyClaude applies or verifies the following CloudCLI fixes during the Docker
+build. The exact commands are in the Dockerfile, and missing patch anchors fail
+the build.
 
-- WebSocket plugin proxy patch: preserves binary frame types in both relay
-  directions by passing the `isBinary` flag through CloudCLI's
-  `server/index.js` message handlers.
+- WebSocket plugin proxy binary-frame verification: current `@cloudcli-ai/cloudcli`
+  already preserves binary frame types with the `isBinary` flag in both relay
+  directions, and the Docker build verifies those anchors.
 - Shell scroll patch: preserves the Shell tab scroll position across periodic
   refreshes in the bundled CloudCLI browser asset.
-- Issue #36 model patches: add `newModel` propagation from
-  `server/routes/commands.js` into the bundled browser code, update the
-  selected Claude model on model events, and keep a custom model option visible
-  in the selector.
-- Codex permission-mode compatibility backport: adds HolyClaude's
-  `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE` runtime mapping for CloudCLI Codex
-  chat, including `default`, `acceptEdits`, and `bypassPermissions` modes.
+- Claude session-title patch: repairs CloudCLI's Claude session synchronizer so
+  transcript-backed session titles do not fall back to `Untitled Claude Session`.
+- Codex lifecycle Apprise notification patch: sends Codex chat stop/error events
+  through HolyClaude's `notify.py` Apprise integration.
+- Codex permission-mode patch: maps `HOLYCLAUDE_CODEX_CHAT_PERMISSION_MODE` to
+  CloudCLI Codex chat permission behavior.
+- Claude model-flow verification: current CloudCLI already carries the model
+  selection flow needed by the older upstream `/model` patch, and the Docker
+  build verifies those anchors.
+
+See `docs/cloudcli-patches.md` for the current compatibility matrix and upstream
+patch status.
 
 The unmodified upstream source is available from the links above, and the
 HolyClaude modifications are visible in the public Dockerfile.

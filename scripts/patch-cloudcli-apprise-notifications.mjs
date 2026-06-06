@@ -1,11 +1,16 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const ORCHESTRATOR_PATH = '/usr/local/lib/node_modules/@siteboon/claude-code-ui/server/services/notification-orchestrator.js';
+const DEFAULT_ORCHESTRATOR_PATH = '/usr/local/lib/node_modules/@cloudcli-ai/cloudcli/dist-server/server/services/notification-orchestrator.js';
+const cliTargetPath = process.argv[2];
+const ORCHESTRATOR_PATH = cliTargetPath || DEFAULT_ORCHESTRATOR_PATH;
 const ERROR_MESSAGE = '[patch] ERROR: CloudCLI notification orchestrator anchors not found';
-const IMPORT_ANCHOR = "import { notificationPreferencesDb, pushSubscriptionsDb, sessionNamesDb } from '../database/db.js';";
+const IMPORT_ANCHORS = [
+  "import { notificationPreferencesDb, pushSubscriptionsDb, sessionsDb } from '../modules/database/index.js';",
+  "import { notificationPreferencesDb, pushSubscriptionsDb, sessionNamesDb } from '../database/db.js';"
+];
 const SPAWN_IMPORT = "import { spawn } from 'child_process';";
-const STOP_ANCHOR = "function notifyRunStopped({ userId, provider, sessionId = null, stopReason = 'completed', sessionName = null })";
-const FAILED_ANCHOR = "function notifyRunFailed({ userId, provider, sessionId = null, error, sessionName = null })";
+const STOP_ANCHOR = "function notifyRunStopped(";
+const FAILED_ANCHOR = "function notifyRunFailed(";
 const HELPER_MARKER = "const APPRISE_PROVIDER_ALLOWLIST = new Set(['codex']);";
 const LEGACY_HELPER_NAME = 'notifyAppriseLifecycle';
 const HELPER_NAME = 'sendAppriseLifecycleNotification';
@@ -85,9 +90,34 @@ const failedCall = `  const errorMessage = normalizeErrorMessage(error);
     error: errorMessage
   });`;
 
-let source = readFileSync(ORCHESTRATOR_PATH, 'utf8');
+function readOrchestratorSource() {
+  try {
+    return readFileSync(ORCHESTRATOR_PATH, 'utf8');
+  } catch (error) {
+    if (!cliTargetPath) {
+      throw error;
+    }
+    console.error(ERROR_MESSAGE);
+    process.exit(1);
+  }
+}
 
-const requiredAnchorsPresent = source.includes(STOP_ANCHOR) && source.includes(FAILED_ANCHOR) && source.includes(IMPORT_ANCHOR);
+function writeOrchestratorSource(source) {
+  try {
+    writeFileSync(ORCHESTRATOR_PATH, source);
+  } catch (error) {
+    if (!cliTargetPath) {
+      throw error;
+    }
+    console.error(ERROR_MESSAGE);
+    process.exit(1);
+  }
+}
+
+let source = readOrchestratorSource();
+const importAnchor = IMPORT_ANCHORS.find((anchor) => source.includes(anchor));
+
+const requiredAnchorsPresent = source.includes(STOP_ANCHOR) && source.includes(FAILED_ANCHOR) && importAnchor;
 if (!requiredAnchorsPresent) {
   console.error(ERROR_MESSAGE);
   process.exit(1);
@@ -108,7 +138,7 @@ if (alreadyApplied) {
 }
 
 if (!source.includes(SPAWN_IMPORT)) {
-  source = source.replace(IMPORT_ANCHOR, `${IMPORT_ANCHOR}\n${SPAWN_IMPORT}`);
+  source = source.replace(importAnchor, `${importAnchor}\n${SPAWN_IMPORT}`);
 }
 
 if (source.includes(LEGACY_HELPER_NAME)) {
@@ -130,22 +160,74 @@ if (source.includes(legacyCatchBlock)) {
   source = source.replace(legacyCatchBlock, '  } catch {\n  }');
 }
 
+function findFunctionBodyStart(source, functionAnchor) {
+  const functionIndex = source.indexOf(functionAnchor);
+  if (functionIndex === -1) {
+    return -1;
+  }
+
+  const paramsStartIndex = source.indexOf('(', functionIndex);
+  if (paramsStartIndex === -1) {
+    return -1;
+  }
+
+  let parenDepth = 0;
+  for (let sourceIndex = paramsStartIndex; sourceIndex < source.length; sourceIndex += 1) {
+    const character = source[sourceIndex];
+    if (character === '(') {
+      parenDepth += 1;
+    } else if (character === ')') {
+      parenDepth -= 1;
+      if (parenDepth === 0) {
+        return source.indexOf('{', sourceIndex);
+      }
+    }
+  }
+
+  return -1;
+}
+
+function insertAfterFunctionOpen(source, functionAnchor, insertText) {
+  const bodyStartIndex = findFunctionBodyStart(source, functionAnchor);
+  if (bodyStartIndex === -1) {
+    return null;
+  }
+
+  return `${source.slice(0, bodyStartIndex + 1)}\n${insertText}${source.slice(bodyStartIndex + 1)}`;
+}
+
 if (!source.includes(HELPER_MARKER)) {
-  source = source.replace(`${STOP_ANCHOR} {`, `${helperCode}\n${STOP_ANCHOR} {`);
-}
-
-if (!source.includes(stopCall)) {
-  source = source.replace(`${STOP_ANCHOR} {\n`, `${STOP_ANCHOR} {\n${stopCall}`);
-}
-
-const failedNeedle = `${FAILED_ANCHOR} {\n  const errorMessage = normalizeErrorMessage(error);`;
-if (!source.includes(failedCall)) {
-  if (!source.includes(failedNeedle)) {
+  const stopFunctionIndex = source.indexOf(STOP_ANCHOR);
+  if (stopFunctionIndex === -1) {
     console.error(ERROR_MESSAGE);
     process.exit(1);
   }
-  source = source.replace(failedNeedle, `${FAILED_ANCHOR} {\n${failedCall}`);
+  source = `${source.slice(0, stopFunctionIndex)}${helperCode}\n${source.slice(stopFunctionIndex)}`;
 }
 
-writeFileSync(ORCHESTRATOR_PATH, source);
+if (!source.includes(stopCall)) {
+  const nextSource = insertAfterFunctionOpen(source, STOP_ANCHOR, stopCall);
+  if (nextSource == null) {
+    console.error(ERROR_MESSAGE);
+    process.exit(1);
+  }
+  source = nextSource;
+}
+
+if (!source.includes(failedCall)) {
+  const failedBodyStartIndex = findFunctionBodyStart(source, FAILED_ANCHOR);
+  if (failedBodyStartIndex === -1) {
+    console.error(ERROR_MESSAGE);
+    process.exit(1);
+  }
+  const existingErrorMessageIndex = source.indexOf('  const errorMessage = normalizeErrorMessage(error);', failedBodyStartIndex);
+  if (existingErrorMessageIndex === -1) {
+    console.error(ERROR_MESSAGE);
+    process.exit(1);
+  }
+  const existingErrorMessageEndIndex = existingErrorMessageIndex + '  const errorMessage = normalizeErrorMessage(error);'.length;
+  source = `${source.slice(0, existingErrorMessageIndex)}${failedCall}${source.slice(existingErrorMessageEndIndex)}`;
+}
+
+writeOrchestratorSource(source);
 console.log('[patch] CloudCLI Apprise lifecycle notifications applied');

@@ -8,7 +8,7 @@
 # ==============================================================================
 
 # ---------- CloudCLI plugins builder ----------
-FROM node:22-bookworm-slim AS cloudcli-plugin-builder
+FROM node:26.3.0-bookworm-slim AS cloudcli-plugin-builder
 
 ENV DEBIAN_FRONTEND=noninteractive \
     npm_config_audit=false \
@@ -29,7 +29,7 @@ RUN set -eux; \
     rm -rf .git src package-lock.json tsconfig.json node_modules/.cache; \
     git clone --depth 1 https://github.com/cloudcli-ai/cloudcli-plugin-terminal.git /plugins/web-terminal; \
     cd /plugins/web-terminal; \
-    npm install; \
+    npm_config_nodedir=/usr/local npm install; \
     npm run build; \
     npm prune --omit=dev; \
     rm -rf .git src package-lock.json tsconfig.json node_modules/.cache; \
@@ -38,12 +38,12 @@ RUN set -eux; \
 
 
 # ---------- Runtime image ----------
-FROM node:22-bookworm-slim
+FROM node:26.3.0-bookworm-slim
 
-LABEL org.opencontainers.image.source=https://github.com/CoderLuii/HolyClaude
+LABEL org.opencontainers.image.source=https://github.com/jhangyu/HolyClaude
 
 # ---------- Build args ----------
-ARG S6_OVERLAY_VERSION=3.2.0.2
+ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG TARGETARCH
 ARG VARIANT=full
 
@@ -56,6 +56,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage" \
     CHROME_PATH=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    CLAUDE_CODE_USE_FOUNDRY=1 \
     npm_config_audit=false \
     npm_config_fund=false \
     npm_config_update_notifier=false
@@ -103,7 +104,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/*
 
 # ---------- Create claude user ----------
-# node:22-bookworm-slim already has UID 1000 as 'node' — rename it to 'claude'
+# node:26.3.0-bookworm-slim already has UID 1000 as 'node' — rename it to 'claude'
 RUN set -eux; \
     usermod -l claude -d /home/claude -m node; \
     groupmod -n claude node; \
@@ -112,21 +113,19 @@ RUN set -eux; \
     mkdir -p /workspace; \
     chown claude:claude /workspace
 
-# ---------- Claude Code CLI, Cursor CLI, Junie CLI ----------
-# CRITICAL: WORKDIR must be non-root-owned or the installer hangs
+# ---------- Cursor CLI ----------
 WORKDIR /workspace
 USER claude
 RUN set -eux; \
-    curl -fsSL https://claude.ai/install.sh | bash; \
     curl -fsSL https://cursor.com/install | bash; \
-    if [ "$VARIANT" = "full" ]; then \
-      curl -fsSL https://junie.jetbrains.com/install.sh | bash; \
-    fi; \
     rm -rf /home/claude/.npm /home/claude/.cache /tmp/*
 USER root
 ENV PATH="/home/claude/.local/bin:${PATH}"
 
 COPY scripts/fix-cloudcli-session-titles.py /usr/local/bin/fix-cloudcli-session-titles.py
+COPY scripts/patch-cloudcli-shell-scroll.mjs /usr/local/bin/patch-cloudcli-shell-scroll.mjs
+COPY scripts/patch-cloudcli-apprise-notifications.mjs /usr/local/bin/patch-cloudcli-apprise-notifications.mjs
+COPY scripts/patch-cloudcli-codex-permissions.mjs /usr/local/bin/patch-cloudcli-codex-permissions.mjs
 RUN chmod +x /usr/local/bin/fix-cloudcli-session-titles.py
 
 # ---------- npm global packages ----------
@@ -138,10 +137,11 @@ RUN set -eux; \
       eslint prettier \
       serve nodemon concurrently \
       dotenv-cli \
+      @anthropic-ai/claude-code@2.1.165 \
       @google/gemini-cli \
-      @openai/codex \
+      @openai/codex@0.137.0 \
       task-master-ai \
-      @cloudcli-ai/cloudcli"; \
+      @cloudcli-ai/cloudcli@1.33.0"; \
     if [ "$VARIANT" = "full" ]; then \
       packages="$packages \
         wrangler vercel netlify-cli \
@@ -151,12 +151,35 @@ RUN set -eux; \
         lighthouse @lhci/cli \
         sharp-cli json-server http-server \
         @marp-team/marp-cli @cloudflare/next-on-pages \
+        @jetbrains/junie-cli@1468.30.0 \
         opencode-ai"; \
     fi; \
     npm i -g --omit=dev --no-audit --no-fund $packages; \
     touch /usr/local/lib/node_modules/@cloudcli-ai/cloudcli/.env; \
     ln -sf /usr/local/bin/cloudcli /usr/local/bin/claude-code-ui; \
     python3 /usr/local/bin/fix-cloudcli-session-titles.py --mode build; \
+    CLOUDCLI_ROOT="/usr/local/lib/node_modules/@cloudcli-ai/cloudcli"; \
+    CLOUDCLI_CODEX="$CLOUDCLI_ROOT/dist-server/server/openai-codex.js"; \
+    CLOUDCLI_NOTIFICATIONS="$CLOUDCLI_ROOT/dist-server/server/services/notification-orchestrator.js"; \
+    CLOUDCLI_COMMANDS="$CLOUDCLI_ROOT/dist-server/server/routes/commands.js"; \
+    CLOUDCLI_WS_PROXY="$CLOUDCLI_ROOT/dist-server/server/modules/websocket/services/plugin-websocket-proxy.service.js"; \
+    grep -Fq "upstream.on('message', (data, isBinary) =>" "$CLOUDCLI_WS_PROXY"; \
+    grep -Fq "clientWs.send(data, { binary: isBinary })" "$CLOUDCLI_WS_PROXY"; \
+    grep -Fq "clientWs.on('message', (data, isBinary) =>" "$CLOUDCLI_WS_PROXY"; \
+    grep -Fq "upstream.send(data, { binary: isBinary })" "$CLOUDCLI_WS_PROXY"; \
+    echo "[patch] CloudCLI WebSocket binary frame fix already present"; \
+    CLOUDCLI_BUNDLE="$(find "$CLOUDCLI_ROOT/dist/assets" -maxdepth 1 -type f -name 'index-*.js' | head -n 1)"; \
+    test -n "$CLOUDCLI_BUNDLE"; \
+    node /usr/local/bin/patch-cloudcli-shell-scroll.mjs "$CLOUDCLI_BUNDLE"; \
+    grep -Fq 'action: "models"' "$CLOUDCLI_COMMANDS"; \
+    grep -Fq "setClaudeModel:" "$CLOUDCLI_BUNDLE"; \
+    grep -Fq 'localStorage.setItem("claude-model"' "$CLOUDCLI_BUNDLE"; \
+    grep -Fq "availableOptions" "$CLOUDCLI_BUNDLE"; \
+    echo "[patch] CloudCLI Claude model selection flow already present"; \
+    node /usr/local/bin/patch-cloudcli-apprise-notifications.mjs "$CLOUDCLI_NOTIFICATIONS"; \
+    node /usr/local/bin/patch-cloudcli-codex-permissions.mjs "$CLOUDCLI_CODEX"; \
+    node --check "$CLOUDCLI_NOTIFICATIONS"; \
+    node --check "$CLOUDCLI_CODEX"; \
     npm cache clean --force; \
     find /usr/local/lib/node_modules -type f -name '*.map' -delete; \
     find /usr/local/lib/node_modules -type d \( \
